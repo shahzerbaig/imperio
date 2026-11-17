@@ -5,18 +5,6 @@ import { useEffect, useRef } from "react";
 import * as THREE from "three";
 import { OrbitControls } from "three/examples/jsm/controls/OrbitControls.js";
 
-/**
- * Interactive gold wireframe villa.
- *
- * Controls:
- * - Drag: Rotate
- * - Pinch / Scroll: Zoom
- * - Two-finger drag / Right-click drag: Pan
- * - Release: Preserve orientation
- * - Auto showcase: Slowly rotate when idle
- * - Double click / Double tap: Reset view
- */
-
 export default function Villa3D() {
   const ref = useRef<HTMLDivElement>(null);
 
@@ -28,10 +16,12 @@ export default function Villa3D() {
       "(prefers-reduced-motion: reduce)"
     ).matches;
 
-    // Scene
+    // ---------------------------------
+    // SCENE & CAMERA
+    // ---------------------------------
+
     const scene = new THREE.Scene();
 
-    // Camera
     const camera = new THREE.PerspectiveCamera(
       40,
       1,
@@ -39,9 +29,8 @@ export default function Villa3D() {
       100
     );
 
-    camera.position.set(7, 4.5, 9);
+    camera.position.set(8, 5.5, 11);
 
-    // Renderer
     const renderer = new THREE.WebGLRenderer({
       antialias: true,
       alpha: true,
@@ -51,14 +40,12 @@ export default function Villa3D() {
       Math.min(window.devicePixelRatio, 2)
     );
 
-    renderer.setSize(
-      el.clientWidth,
-      el.clientHeight
-    );
-
     el.appendChild(renderer.domElement);
 
-    // Orbit controls
+    // ---------------------------------
+    // ORBIT CONTROLS
+    // ---------------------------------
+
     const controls = new OrbitControls(
       camera,
       renderer.domElement
@@ -75,19 +62,19 @@ export default function Villa3D() {
     controls.zoomSpeed = 0.8;
     controls.panSpeed = 0.7;
 
-    // Vertical rotation limits
-    controls.minPolarAngle = 0.3;
-    controls.maxPolarAngle = Math.PI / 2;
+    controls.minPolarAngle = 0.2;
+    controls.maxPolarAngle = Math.PI / 2.02;
 
-    // Zoom limits
-    controls.minDistance = 5;
-    controls.maxDistance = 20;
+    controls.minDistance = 4;
+    controls.maxDistance = 25;
 
-    // Focus point
-    controls.target.set(0, 1.5, 0);
+    controls.target.set(0, 1.3, 1);
     controls.update();
 
-    // Materials
+    // ---------------------------------
+    // MATERIALS
+    // ---------------------------------
+
     const gold = new THREE.LineBasicMaterial({
       color: 0xc9a45c,
     });
@@ -98,10 +85,38 @@ export default function Villa3D() {
       opacity: 0.35,
     });
 
-    // Villa group
-    const villa = new THREE.Group();
+    const bright = new THREE.LineBasicMaterial({
+      color: 0xf4d48a,
+    });
+
+    const green = new THREE.LineBasicMaterial({
+      color: 0x719b70,
+      transparent: true,
+      opacity: 0.75,
+    });
+
+    const gardenDim = new THREE.LineBasicMaterial({
+      color: 0x719b70,
+      transparent: true,
+      opacity: 0.3,
+    });
+
+    const materials = [
+      gold,
+      dim,
+      bright,
+      green,
+      gardenDim,
+    ];
 
     const geometries: THREE.BufferGeometry[] = [];
+
+    const property = new THREE.Group();
+    scene.add(property);
+
+    // ---------------------------------
+    // GEOMETRY HELPERS
+    // ---------------------------------
 
     const block = (
       w: number,
@@ -110,12 +125,20 @@ export default function Villa3D() {
       x: number,
       y: number,
       z: number,
-      material = gold
+      material: THREE.LineBasicMaterial = gold,
+      parent: THREE.Object3D = property
     ) => {
-      const geometry = new THREE.EdgesGeometry(
-        new THREE.BoxGeometry(w, h, d)
+      const boxGeometry = new THREE.BoxGeometry(
+        w,
+        h,
+        d
       );
 
+      const geometry = new THREE.EdgesGeometry(
+        boxGeometry
+      );
+
+      boxGeometry.dispose();
       geometries.push(geometry);
 
       const lines = new THREE.LineSegments(
@@ -124,9 +147,58 @@ export default function Villa3D() {
       );
 
       lines.position.set(x, y, z);
+      parent.add(lines);
 
-      villa.add(lines);
+      return lines;
     };
+
+    const line = (
+      points: THREE.Vector3[],
+      material: THREE.LineBasicMaterial = dim
+    ) => {
+      const geometry = new THREE.BufferGeometry()
+        .setFromPoints(points);
+
+      geometries.push(geometry);
+
+      const object = new THREE.Line(
+        geometry,
+        material
+      );
+
+      property.add(object);
+
+      return object;
+    };
+
+    const circle = (
+      radius: number,
+      x: number,
+      y: number,
+      z: number,
+      material: THREE.LineBasicMaterial = green,
+      segments = 32
+    ) => {
+      const points: THREE.Vector3[] = [];
+
+      for (let i = 0; i <= segments; i++) {
+        const angle = (i / segments) * Math.PI * 2;
+
+        points.push(
+          new THREE.Vector3(
+            x + Math.cos(angle) * radius,
+            y,
+            z + Math.sin(angle) * radius
+          )
+        );
+      }
+
+      return line(points, material);
+    };
+
+    // ---------------------------------
+    // MAIN VILLA
+    // ---------------------------------
 
     // Ground floor
     block(4, 1.6, 2.6, 0, 0.8, 0);
@@ -134,15 +206,28 @@ export default function Villa3D() {
     // Upper floor
     block(2.8, 1.4, 2.2, -0.5, 2.3, 0);
 
-    // Tower
+    // Architectural tower
     block(2.2, 3.1, 1.6, 2.1, 1.55, -0.5);
 
-    // Slabs
+    // Floor slabs
     block(4.4, 0.12, 3, 0, 1.66, 0, dim);
-    block(3.2, 0.12, 2.6, -0.5, 3.06, 0, dim);
-    block(2.6, 0.12, 2, 2.1, 3.16, -0.5, dim);
 
-    // Front colonnade
+    block(
+      3.2, 0.12, 2.6,
+      -0.5, 3.06, 0,
+      dim
+    );
+
+    block(
+      2.6, 0.12, 2,
+      2.1, 3.16, -0.5,
+      dim
+    );
+
+    // ---------------------------------
+    // FRONT COLUMNS
+    // ---------------------------------
+
     for (let i = 0; i < 5; i++) {
       block(
         0.12,
@@ -155,16 +240,487 @@ export default function Villa3D() {
       );
     }
 
-    // Windows
-    block(1.1, 0.7, 0.05, -1, 0.9, 1.31, dim);
-    block(1.1, 0.7, 0.05, 0.6, 0.9, 1.31, dim);
+    // ---------------------------------
+    // GROUND FLOOR WINDOWS
+    // ---------------------------------
 
-    scene.add(villa);
+    const addWindow = (
+      x: number,
+      y: number,
+      z: number,
+      width: number,
+      height: number
+    ) => {
+      // Outer frame
+      block(
+        width,
+        height,
+        0.06,
+        x,
+        y,
+        z,
+        bright
+      );
 
-    // Ground grid
+      // Vertical mullion
+      block(
+        0.025,
+        height,
+        0.07,
+        x,
+        y,
+        z,
+        dim
+      );
+
+      // Horizontal mullion
+      block(
+        width,
+        0.025,
+        0.07,
+        x,
+        y,
+        z,
+        dim
+      );
+
+      // Window sill
+      block(
+        width + 0.12,
+        0.05,
+        0.18,
+        x,
+        y - height / 2 - 0.04,
+        z + 0.05,
+        gold
+      );
+    };
+
+    addWindow(
+      -1.15,
+      0.95,
+      1.34,
+      0.85,
+      0.65
+    );
+
+    addWindow(
+      1.1,
+      0.95,
+      1.34,
+      0.65,
+      0.65
+    );
+
+    // ---------------------------------
+    // MAIN ENTRANCE DOOR
+    // ---------------------------------
+
+    const doorX = -0.1;
+    const doorZ = 1.36;
+
+    // Main door frame
+    block(
+      0.72,
+      1.35,
+      0.08,
+      doorX,
+      0.675,
+      doorZ,
+      bright
+    );
+
+    // Inner door panel
+    block(
+      0.62,
+      1.25,
+      0.025,
+      doorX,
+      0.675,
+      doorZ + 0.045,
+      dim
+    );
+
+    // Decorative door panels
+    block(
+      0.44,
+      0.48,
+      0.025,
+      doorX,
+      0.98,
+      doorZ + 0.065,
+      dim
+    );
+
+    block(
+      0.44,
+      0.48,
+      0.025,
+      doorX,
+      0.42,
+      doorZ + 0.065,
+      dim
+    );
+
+    // Door handle
+    block(
+      0.035,
+      0.15,
+      0.035,
+      doorX + 0.23,
+      0.7,
+      doorZ + 0.1,
+      bright
+    );
+
+    // Entrance step
+    block(
+      1.1,
+      0.12,
+      0.55,
+      doorX,
+      0.06,
+      1.7,
+      gold
+    );
+
+    // Entrance canopy
+    block(
+      1.25,
+      0.08,
+      0.7,
+      doorX,
+      1.5,
+      1.55,
+      gold
+    );
+
+    // ---------------------------------
+    // FIRST FLOOR WINDOW
+    // ---------------------------------
+
+    // Upper-floor front face is z = 1.1
+    addWindow(
+      -0.7,
+      2.35,
+      1.135,
+      1.25,
+      0.85
+    );
+
+    // Decorative top lintel
+    block(
+      1.45,
+      0.07,
+      0.18,
+      -0.7,
+      2.82,
+      1.2,
+      gold
+    );
+
+    // ---------------------------------
+    // PROPERTY GROUND / GARDEN
+    // ---------------------------------
+
+    // Plot boundary
+    block(
+      9,
+      0.04,
+      10,
+      0,
+      -0.04,
+      2,
+      dim
+    );
+
+    // Front garden begins beyond house
+    // House front: z = 1.3
+
+    // Left lawn bed
+    block(
+      2.5,
+      0.025,
+      3.6,
+      -2.8,
+      0.015,
+      4.2,
+      green
+    );
+
+    // Right lawn bed
+    block(
+      2.5,
+      0.025,
+      3.6,
+      2.8,
+      0.015,
+      4.2,
+      green
+    );
+
+    // Garden border edging
+    block(
+      2.65,
+      0.12,
+      3.75,
+      -2.8,
+      0.06,
+      4.2,
+      gardenDim
+    );
+
+    block(
+      2.65,
+      0.12,
+      3.75,
+      2.8,
+      0.06,
+      4.2,
+      gardenDim
+    );
+
+    // ---------------------------------
+    // WALKWAY TO ENTRANCE
+    // ---------------------------------
+
+    // Path from front gate to door
+    block(
+      1.1,
+      0.035,
+      4.8,
+      doorX,
+      0.025,
+      4.1,
+      gold
+    );
+
+    // Individual paving divisions
+    for (let i = 0; i < 9; i++) {
+      const z = 1.9 + i * 0.5;
+
+      line(
+        [
+          new THREE.Vector3(
+            doorX - 0.55, 0.05, z
+          ),
+          new THREE.Vector3(
+            doorX + 0.55, 0.05, z
+          ),
+        ],
+        dim
+      );
+    }
+
+    // ---------------------------------
+    // GARDEN TREES
+    // ---------------------------------
+
+    const addTree = (
+      x: number,
+      z: number,
+      height = 1.4
+    ) => {
+      // Trunk
+      block(
+        0.12,
+        height * 0.55,
+        0.12,
+        x,
+        height * 0.275,
+        z,
+        gold
+      );
+
+      // Wireframe foliage
+      const foliageGeometry = new THREE.IcosahedronGeometry(
+        height * 0.42,
+        1
+      );
+
+      const edges = new THREE.EdgesGeometry(
+        foliageGeometry
+      );
+
+      foliageGeometry.dispose();
+      geometries.push(edges);
+
+      const crown = new THREE.LineSegments(
+        edges,
+        green
+      );
+
+      crown.position.set(
+        x,
+        height * 0.82,
+        z
+      );
+
+      property.add(crown);
+
+      // Ground planting ring
+      circle(
+        0.5,
+        x,
+        0.035,
+        z,
+        gardenDim
+      );
+    };
+
+    addTree(-3.2, 3.2, 1.5);
+    addTree(-3.2, 5.2, 1.2);
+    addTree(3.2, 3.2, 1.5);
+    addTree(3.2, 5.2, 1.2);
+
+    // ---------------------------------
+    // SHRUBS AND FLOWER BEDS
+    // ---------------------------------
+
+    const addShrub = (
+      x: number,
+      z: number,
+      radius = 0.22
+    ) => {
+      const geometry = new THREE.IcosahedronGeometry(
+        radius,
+        1
+      );
+
+      const edges = new THREE.EdgesGeometry(
+        geometry
+      );
+
+      geometry.dispose();
+      geometries.push(edges);
+
+      const shrub = new THREE.LineSegments(
+        edges,
+        green
+      );
+
+      shrub.position.set(
+        x,
+        radius,
+        z
+      );
+
+      property.add(shrub);
+    };
+
+    // Shrub rows on both sides of walkway
+    for (let i = 0; i < 8; i++) {
+      const z = 2.15 + i * 0.55;
+
+      addShrub(-0.85, z, 0.18);
+      addShrub(0.85, z, 0.18);
+    }
+
+    // Garden flower bed patterns
+    for (let i = 0; i < 5; i++) {
+      circle(
+        0.18,
+        -2.1 + (i % 2) * 0.55,
+        0.04,
+        3.1 + i * 0.55,
+        gardenDim
+      );
+
+      circle(
+        0.18,
+        2.1 + (i % 2) * 0.55,
+        0.04,
+        3.1 + i * 0.55,
+        gardenDim
+      );
+    }
+
+    // ---------------------------------
+    // GARDEN BOUNDARY FENCE
+    // ---------------------------------
+
+    // Left boundary
+    block(
+      0.06,
+      0.65,
+      9.5,
+      -4.45,
+      0.325,
+      2,
+      dim
+    );
+
+    // Right boundary
+    block(
+      0.06,
+      0.65,
+      9.5,
+      4.45,
+      0.325,
+      2,
+      dim
+    );
+
+    // Rear boundary
+    block(
+      8.9,
+      0.65,
+      0.06,
+      0,
+      0.325,
+      -2.75,
+      dim
+    );
+
+    // Front boundary with gate opening
+    block(
+      3.5,
+      0.65,
+      0.06,
+      -2.75,
+      0.325,
+      6.75,
+      dim
+    );
+
+    block(
+      3.5,
+      0.65,
+      0.06,
+      2.75,
+      0.325,
+      6.75,
+      dim
+    );
+
+    // Gate posts
+    block(
+      0.15,
+      0.9,
+      0.15,
+      -0.9,
+      0.45,
+      6.75,
+      bright
+    );
+
+    block(
+      0.15,
+      0.9,
+      0.15,
+      0.9,
+      0.45,
+      6.75,
+      bright
+    );
+
+    // ---------------------------------
+    // GROUND GRID
+    // ---------------------------------
+
     const grid = new THREE.GridHelper(
-      24,
-      24,
+      30,
+      30,
       0xc9a45c,
       0xc9a45c
     );
@@ -172,15 +728,19 @@ export default function Villa3D() {
     const gridMaterial = grid.material as THREE.Material;
 
     gridMaterial.transparent = true;
-    gridMaterial.opacity = 0.12;
+    gridMaterial.opacity = 0.09;
 
+    grid.position.y = -0.09;
     scene.add(grid);
 
-    // Ambient particles
+    // ---------------------------------
+    // AMBIENT PARTICLES
+    // ---------------------------------
+
     const points = new Float32Array(240 * 3);
 
     for (let i = 0; i < points.length; i++) {
-      points[i] = (Math.random() - 0.5) * 16;
+      points[i] = (Math.random() - 0.5) * 18;
     }
 
     const particleGeometry = new THREE.BufferGeometry();
@@ -194,17 +754,20 @@ export default function Villa3D() {
       color: 0xe8cf94,
       size: 0.03,
       transparent: true,
-      opacity: 0.7,
+      opacity: 0.6,
     });
 
-    const particles = new THREE.Points(
-      particleGeometry,
-      particleMaterial
+    scene.add(
+      new THREE.Points(
+        particleGeometry,
+        particleMaterial
+      )
     );
 
-    scene.add(particles);
+    // ---------------------------------
+    // RESPONSIVE RESIZE
+    // ---------------------------------
 
-    // Responsive resize
     const resize = () => {
       const width = el.clientWidth;
       const height = el.clientHeight;
@@ -218,39 +781,53 @@ export default function Villa3D() {
     };
 
     const resizeObserver = new ResizeObserver(resize);
-
     resizeObserver.observe(el);
+    resize();
 
-    // Reset camera
+    // ---------------------------------
+    // RESET VIEW
+    // ---------------------------------
+
     const resetView = () => {
-      camera.position.set(7, 4.5, 9);
-
-      controls.target.set(0, 1.5, 0);
-
+      camera.position.set(8, 5.5, 11);
+      controls.target.set(0, 1.3, 1);
       controls.update();
     };
 
-    // Double-click reset
     renderer.domElement.addEventListener(
       "dblclick",
       resetView
     );
 
-    // Animation
+    // ---------------------------------
+    // ANIMATION
+    // ---------------------------------
+
     let raf = 0;
-    let time = 0;
+    let lastInteraction = performance.now();
+
+    const onInteraction = () => {
+      lastInteraction = performance.now();
+    };
+
+    controls.addEventListener(
+      "start",
+      onInteraction
+    );
 
     const tick = () => {
-      if (!reduceMotion) {
-        time += 0.0035;
-
-        // Gentle vertical floating
-        villa.position.y = Math.sin(time * 6) * 0.08;
+      // Auto-showcase after 6 seconds of inactivity
+      if (
+        !reduceMotion &&
+        performance.now() - lastInteraction > 6000
+      ) {
+        controls.autoRotate = true;
+        controls.autoRotateSpeed = 0.35;
+      } else {
+        controls.autoRotate = false;
       }
 
-      // Update interactive camera
       controls.update();
-
       renderer.render(scene, camera);
 
       raf = requestAnimationFrame(tick);
@@ -258,7 +835,10 @@ export default function Villa3D() {
 
     tick();
 
-    // Cleanup
+    // ---------------------------------
+    // CLEANUP
+    // ---------------------------------
+
     return () => {
       cancelAnimationFrame(raf);
 
@@ -269,20 +849,28 @@ export default function Villa3D() {
         resetView
       );
 
+      controls.removeEventListener(
+        "start",
+        onInteraction
+      );
+
       controls.dispose();
 
       geometries.forEach((geometry) =>
         geometry.dispose()
       );
 
+      materials.forEach((material) =>
+        material.dispose()
+      );
+
       particleGeometry.dispose();
       particleMaterial.dispose();
 
-      gold.dispose();
-      dim.dispose();
+      grid.geometry.dispose();
+      gridMaterial.dispose();
 
       renderer.dispose();
-
       renderer.domElement.remove();
     };
   }, []);
@@ -291,8 +879,8 @@ export default function Villa3D() {
     <div
       ref={ref}
       className="villa"
-      aria-label="Interactive 3D villa. Drag to rotate, pinch to zoom."
       role="img"
+      aria-label="Interactive 3D villa with landscaped garden, main entrance and first-floor window. Drag to rotate and pinch to zoom."
     />
   );
 }
